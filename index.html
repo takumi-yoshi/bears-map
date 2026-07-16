@@ -11,32 +11,6 @@
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
         integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
         crossorigin=""></script>
-</head>
-
-<body>
-    <!-- 地図を表示するdiv要素を宣言 -->
-
-    <div id="filter-panel">
-        <label>種類</label><br>
-        <select id="filterType">
-            <option value="none">なし</option>
-            <option value="year">年</option>
-            <option value="month">月</option>
-            <option value="time">時間帯</option>
-        </select>
-        <br><br>
-        <div id="sliderContainer" style="display:none;">
-            <label id="sliderLabel">値</label><br>
-
-            <span id="sliderValue"></span><br>
-
-            <input type="range" id="filterSlider" style="width:100%;">
-        </div>
-        <hr>
-        表示件数：
-        <span id="count">0</span>件
-    </div>
-
     <style>
         .info {
             background: white;
@@ -55,14 +29,54 @@
             padding: 10px;
             border-radius: 5px;
             box-shadow: 0 0 5px rgb(53, 53, 53);
-            width: 180px;
+            width: 230px;
         }
 
         #filter-panel select {
             width: 100%;
         }
-    </style>
 
+        .legend {
+            background: white;
+            padding: 8px 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+            line-height: 1.6em;
+            font-size: 12px;
+        }
+
+        .legend i {
+            width: 16px;
+            height: 16px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 地図を表示するdiv要素を宣言 -->
+
+    <div id="filter-panel">
+        <label>フィルター（ヒグマ出没地点）</label><br>
+        <label>種類</label><br>
+        <select id="filterType">
+            <option value="none">なし</option>
+            <option value="year">年</option>
+            <option value="month">月</option>
+            <option value="time">時間帯</option>
+        </select>
+        <br><br>
+        <div id="sliderContainer" style="display:none;">
+            <label id="sliderLabel">値</label><br>
+            <span id="sliderValue"></span><br>
+            <input type="range" id="filterSlider" style="width:100%;">
+        </div>
+        <hr>
+        表示件数：
+        <span id="count">0</span>件
+    </div>
 
 
     <div id="map" style="height: 99vh"></div>
@@ -188,6 +202,42 @@
             zoom: 10, // 初期ズームレベル
         });
 
+        // 凡例
+        const legend = L.control({
+            position: 'bottomright'
+        });
+        legend.onAdd = function () {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <b>凡例</b><br>                
+                <div>
+                    <span style="
+                        display:inline-block;
+                        width:10px;
+                        height:10px;
+                        background:red;
+                        border:1px solid white;
+                        border-radius:50%;
+                        margin-right:8px;
+                    "></span>
+                    ヒグマ出没地点（2016年-2025年）
+                </div>
+                <div>
+                    <i style="
+                        background:red;
+                        <i style="
+                        opacity:0.2;
+                        display:inline-block;
+                    "></i>
+                    ヒグマ生息メッシュ（2004年）
+                </div>
+
+            `;
+            return div;
+        };
+
+        legend.addTo(map);
+
         const info = L.control({ position: 'topright' });
         info.onAdd = function () {
             const div = L.DomUtil.create('div', 'info');
@@ -257,7 +307,9 @@
         map.attributionControl.addAttribution(
             '<a href="https://ckan.pf-sapporo.jp/dataset/sapporo_bear_appearance">札幌市内のヒグマ出没情報</a>',
         );
-
+        map.attributionControl.addAttribution(
+            '<a href="https://geoportal.env.go.jp/datasets/f760a4a146ae40cea50e8f78d6e9679f_0/about">基礎調査2004 クマ類全国分布メッシュ</a>',
+        );
 
         fetch('./bearsmesh_2004.geojson') // 出没メッシュデータ
             .then((res) => res.json())
@@ -278,12 +330,8 @@
                     )
                     .addTo(map);
                 // レイヤー一覧に追加
-                layersControl.addOverlay(polygon, '2004年ヒグマ出没メッシュ');
+                layersControl.addOverlay(polygon, 'ヒグマ生息メッシュ（2004年）');
             });
-        //データ出典
-        map.attributionControl.addAttribution(
-            '<a href="https://geoportal.env.go.jp/datasets/f760a4a146ae40cea50e8f78d6e9679f_0/about">基礎調査2004 クマ類全国分布メッシュ</a>',
-        );
         document
             .getElementById('filterType')
             .addEventListener(
