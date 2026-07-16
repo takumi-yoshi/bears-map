@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ヒグマ出没地点</title>
+    <!-- LeafletのCSS読み込み -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+        crossorigin="" />
+    <!-- LeafletのJavaScript読み込み -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin=""></script>
+</head>
+
+<body>
+    <!-- 地図を表示するdiv要素を宣言 -->
+
+    <div id="filter-panel">
+        <label>種類</label><br>
+        <select id="filterType">
+            <option value="none">なし</option>
+            <option value="year">年</option>
+            <option value="month">月</option>
+            <option value="time">時間帯</option>
+        </select>
+        <br><br>
+        <div id="sliderContainer" style="display:none;">
+            <label id="sliderLabel">値</label><br>
+
+            <span id="sliderValue"></span><br>
+
+            <input type="range" id="filterSlider" style="width:100%;">
+        </div>
+        <hr>
+        表示件数：
+        <span id="count">0</span>件
+    </div>
+
+    <style>
+        .info {
+            background: white;
+            padding: 8px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+            font-size: 12px;
+        }
+
+        #filter-panel {
+            position: absolute;
+            top: 100px;
+            left: 10px;
+            z-index: 1000;
+            background: rgb(255, 254, 254);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgb(53, 53, 53);
+            width: 180px;
+        }
+
+        #filter-panel select {
+            width: 100%;
+        }
+    </style>
+
+
+
+    <div id="map" style="height: 99vh"></div>
+    <script>
+        let bearsGeojson;
+        let bearsLayer;
+        function getTimeGroup(timeText) {
+            if (!timeText) return null;
+            const hour =
+                parseInt(timeText.split(':')[0]);
+            if (hour < 4) return 0;
+            if (hour < 8) return 1;
+            if (hour < 12) return 2;
+            if (hour < 16) return 3;
+            if (hour < 20) return 4;
+            return 5;
+        }
+
+        function updateFilterOptions() {
+            const type =
+                document.getElementById('filterType').value;
+            const slider =
+                document.getElementById('filterSlider');
+            const sliderContainer =
+                document.getElementById('sliderContainer');
+            const sliderValue =
+                document.getElementById('sliderValue');
+            if (type === 'none') {
+                sliderContainer.style.display = 'none';
+            }
+            else if (type === 'year') {
+                sliderContainer.style.display = 'block';
+                slider.min = 2016;
+                slider.max = 2025;
+                slider.step = 1;
+                slider.value = 2025;
+                sliderValue.textContent =
+                    slider.value + '年';
+            }
+            else if (type === 'month') {
+                sliderContainer.style.display = 'block';
+                slider.min = 1;
+                slider.max = 12;
+                slider.step = 1;
+                slider.value = 1;
+                sliderValue.textContent =
+                    slider.value + '月';
+            }
+            else if (type === 'time') {
+                sliderContainer.style.display = 'block';
+                slider.min = 0;
+                slider.max = 5;
+                slider.step = 1;
+                slider.value = 0;
+                const labels = [
+                    '0～4時',
+                    '4～8時',
+                    '8～12時',
+                    '12～16時',
+                    '16～20時',
+                    '20～24時'
+                ];
+                sliderValue.textContent =
+                    labels[slider.value];
+            }
+            updateBearLayer();
+        }
+
+
+        function updateBearLayer() {
+            if (!bearsGeojson) return;
+            let count = 0;  // ←追加
+            if (bearsLayer) {
+                map.removeLayer(bearsLayer);
+            }
+            const type =
+                document.getElementById('filterType').value;
+            const value =
+                document.getElementById('filterSlider').value;
+            bearsLayer = L.geoJSON(bearsGeojson, {
+                filter: function (feature) {
+                    const p = feature.properties;
+                    let show = true;
+                    if (type === 'year') {
+                        show = Number(p.year) === Number(value);
+                    }
+                    else if (type === 'month') {
+                        show = Number(p.month) === Number(value);
+                    }
+                    else if (type === 'time') {
+                        show = getTimeGroup(p.Time_text) == value;
+                    }
+                    if (show) {
+                        count++;
+                    }
+                    return show;
+                },
+
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, {
+                        radius: 4,
+                        fillColor: 'red',
+                        color: 'white',
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                }
+            })
+                .bindPopup(
+                    layer =>
+                        '出没日時：' +
+                        layer.feature.properties.Date_text
+                )
+                .addTo(map);
+            document.getElementById('count').textContent = count;
+        }
+
+
+        // 地図インスタンスを初期化
+        const map = L.map('map', {
+            center: [43.06, 141.35], // 初期表示の地図中心の[緯度, 経度]
+            zoom: 10, // 初期ズームレベル
+        });
+
+        const info = L.control({ position: 'topright' });
+        info.onAdd = function () {
+            const div = L.DomUtil.create('div', 'info');
+            div.innerHTML = `
+                <details>
+                    <summary>ⓘ 情報</summary>
+                    <p>
+                        本サイトは札幌市公開データを利用しています。
+                    </p>
+                    <p>
+                        データの最新性・正確性を保証するものではありません。
+                    </p>
+                    <p>
+                        <a href="https://ckan.pf-sapporo.jp/dataset/sapporo_bear_appearance">札幌市内のヒグマ出没情報
+                        </a>
+                    </p>
+                </details>
+            `;
+            return div;
+        };
+        info.addTo(map);
+
+
+
+        // 背景地図データ
+        const baseLayers = {
+            OpenStreetMap: L.tileLayer(
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                {
+                    maxZoom: 19,
+                    attribution:
+                        '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                },
+            ),
+            地理院地図: L.tileLayer(
+                'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
+                {
+                    maxZoom: 18,
+                    attribution:
+                        '<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>',
+                },
+            ),
+            空中写真: L.tileLayer(
+                'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',
+                {
+                    maxZoom: 17,
+                    attribution:
+                        '<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>',
+                },
+            ),
+        };
+        map.addLayer(baseLayers['OpenStreetMap']); // OSMを初期表示
+
+        // レイヤー切り替えコントロール
+        const layersControl = L.control
+            .layers(baseLayers, [], { collapsed: false })
+            .addTo(map);
+
+
+        fetch('./bears.geojson')
+            .then(res => res.json())
+            .then(json => {
+                bearsGeojson = json;
+                updateFilterOptions();
+            });
+        //データ出典
+        map.attributionControl.addAttribution(
+            '<a href="https://ckan.pf-sapporo.jp/dataset/sapporo_bear_appearance">札幌市内のヒグマ出没情報</a>',
+        );
+
+
+        fetch('./bearsmesh_2004.geojson') // 出没メッシュデータ
+            .then((res) => res.json())
+            .then((json) => {
+                // GeoJSONレイヤーを作成
+                const polygon = L.geoJSON(json, {
+                    style: (feature) => ({
+                        color: 'red',
+                        stroke: false,
+                        fillOpacity:
+                            feature.properties['f2000_2003'] * 0.2
+                    }),
+                })
+                    // ポップアップで事業者名と路線名を表示
+                    .bindPopup(
+                        (layer) =>
+                            'ID: ' + layer.feature.properties['objectid'],
+                    )
+                    .addTo(map);
+                // レイヤー一覧に追加
+                layersControl.addOverlay(polygon, '2004年ヒグマ出没メッシュ');
+            });
+        //データ出典
+        map.attributionControl.addAttribution(
+            '<a href="https://geoportal.env.go.jp/datasets/f760a4a146ae40cea50e8f78d6e9679f_0/about">基礎調査2004 クマ類全国分布メッシュ</a>',
+        );
+        document
+            .getElementById('filterType')
+            .addEventListener(
+                'change',
+                updateFilterOptions
+            );
+
+        document
+            .getElementById('filterSlider')
+            .addEventListener('input', function () {
+                const type =
+                    document.getElementById('filterType').value;
+                const value = this.value;
+                const sliderValue =
+                    document.getElementById('sliderValue');
+                if (type === 'year') {
+                    sliderValue.textContent =
+                        value + '年';
+                }
+                else if (type === 'month') {
+                    sliderValue.textContent =
+                        value + '月';
+                }
+                else if (type === 'time') {
+                    const labels = [
+                        '0～4時',
+                        '4～8時',
+                        '8～12時',
+                        '12～16時',
+                        '16～20時',
+                        '20～24時'
+                    ];
+                    sliderValue.textContent =
+                        labels[value];
+                }
+                updateBearLayer();
+            });            
+    </script>
+</body>
+
+</html>
